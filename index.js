@@ -16,80 +16,104 @@ function randomNumGen(min, max) {
 
 start();
 
-// Makes array 0 to max
-function createArray(max) {
-  let gameArray = [];
-  for (let i = 1; i <= parseInt(max); i++) {
-    gameArray.push(i);
-  }
-
-  return gameArray;
-}
-
 async function start() {
-  // Geting user input for gameArray range and asking them which of the two games they'd like to play
-  let whatGame = await ask(
-    "Would you, the human (H) like to guess my secret number? Or should I the computer (C) guess yours?"
+  // Geting user input for what game they would like to play, and using my inputSan function on it
+  let whatGame = await inputSan(
+    await ask(
+      "Would you, the human (H) like to guess my secret number? Or should I the computer (C) guess yours?"
+    ),
+    ["C", "H"]
   );
 
-  let upperBound = await ask("How many numbers would you like to use?");
+  //Doing the same for the upperbound which will be used as the max of the rang of numbers
+  let upperBound = await inputSan(
+    await ask("How many numbers would you like to use?"),
+    ["number"]
+  );
 
-  // Starting the first or second game based on user input
+  //If whatGame is Computer
   if (whatGame === "C") {
+    //console log starting message
     console.log(
       " Ok, let's play a game where you (human) make up a number and I (computer) try to guess it."
     );
-
-    let secretNumber = await ask(
-      "What is your secret number?\nI won't peek, I promise...\n"
+    //Let user input there secret number
+    let secretNumber = await inputSan(
+      await ask(
+        "What is your secret number?\nI won't peek, I promise...\n"
+        //input san requires array has number in it so we can seperate strings from numbers in input san
+      ),
+      ["number"]
     );
-
+    //Telling user the number they inputted
     console.log("You entered: " + secretNumber);
-
-    await computerGuess(upperBound);
-    cheatDetect(secretNumber);
+    //Running computerGuess function which is the gameplay loop for Computer game, passes in secret number and upperbound as an arg so the function can use it
+    await computerGuess(upperBound, secretNumber);
+    //If user chooses human game
   } else if (whatGame === "H") {
+    //Log beggening message
     console.log(
       "Let's play a game where I (computer) make up a number and you (Human) try to guess it."
     );
-
+    // await humanGuess (gameplay loop for human game ) pass in upperbound don't need secret number because human is guessing the number
     await humanGuess(upperBound);
     process.exit();
-  } else {
-    console.log("Please enter a valid input");
   }
 }
 
-async function computerGuess(upperBound) {
-  let gameArray = createArray(upperBound);
-
+async function computerGuess(upperBound, num) {
   // Initializing while loop variables
-  indexStart = 0;
-  indexEnd = gameArray.length - 1;
+  let indexStart = 0;
+  let indexEnd = upperBound;
   let playAgain;
-  i = 0;
+  //counter so we can tell guesses at the end of the game
+  let guessCount = 0;
+  //Middle is the middle of the guess range
+  let middle;
 
   // gameplay loop incorporating binary search
-  while (indexStart <= indexEnd) {
+  while (middle !== num) {
     // adding one to the count at the start of loop
-    i++;
+    guessCount++;
+    //Check to see if user has exceed the maximum number of guesses possible
+    if (guessCount > Math.log2(parseInt(upperBound)) + 1) {
+      //if so they cheated
+      console.log("You cheated");
+      process.exit();
+    }
+
+    //Setting middle to be equally between index end and index start
     middle = Math.floor(indexStart + (indexEnd - indexStart) / 2);
-    middleVal = gameArray[middle];
 
     // get Higher or lower string
-    item = await ask(
-      `Is your number ${middleVal} (C) ? Is it higher (H) or lower (L) than ${middleVal}? `
+    item = await inputSan(
+      await ask(
+        `Is your number ${middle} (C) ? Is it higher (H) or lower (L) than ${middle}? `
+      ),
+      ["H", "L", "C"]
     );
 
-    //Conitional to check if its higher,lower, or correct
+    //Conditional to check if its higher,lower, or correct
     if ("C" === item) {
-      // if correct ask() if user wants to replay the game
+      //See if user lied when saying correct
+      if (parseInt(num) !== middle) {
+        console.log("You cheated");
+        process.exit();
+      }
+      //logs saying ending message and how mnay guesses it took
       console.log("Nice I won");
-      console.log(`that took ${i} guesses`);
-      playAgain = await ask("Would you like to play again?");
+      console.log(`that took ${guessCount} guesses`);
+      // if correct ask() if user wants to replay the game
+      playAgain = await inputSan(
+        await ask("Would you like to play again? (Y/ N)"),
+        ["Y", "N"]
+      );
+      //if Y
       if (playAgain === "Y") {
+        //Start game again
         start();
       } else {
+        //otherwise end game
         process.exit();
       }
       // if lower change the end of the index to be guess -1
@@ -102,37 +126,51 @@ async function computerGuess(upperBound) {
     }
     // if invalid input restart loop and take -1 the iterator
     else {
-      i--;
+      guessCount--;
       console.log("Please enter a valid input");
     }
   }
 }
 
+//Gameplay loop for human game
 async function humanGuess(upperBound) {
+  //Get random number for secret number using the upperBound user inputed in start
   let secretNumber = randomNumGen(1, upperBound);
-  let humanGuess = await ask("Whats your guess?");
+  //Ask human for guess
+  let humanGuess = await inputSan(await ask("Whats your guess?"), ["number"]);
 
   // gameplay loop for second game
-  while (humanGuess !== secretNumber) {
+  while (humanGuess !== secretNumber.toString()) {
+    // if humanguess less than secret number tell user higher
     if (humanGuess < secretNumber) {
       console.log(`Nope its higher than ${humanGuess}`);
+      // if humanguess higher than secret number tell user secret number is lower
     } else if (humanGuess > secretNumber) {
       console.log(`Nope its lower than ${humanGuess}`);
-    } else {
-      break;
     }
-
-    humanGuess = await ask("Whats your guess?");
+    //ask for humanguess at end of loop
+    humanGuess = await inputSan(await ask("Whats your guess?"), ["number"]);
   }
-
+  //once user guesses correctly congratualate them for winning
   console.log("Congrats you won!");
 }
 
-//check if user cheated
-function cheatDetect(secretNumber) {
-  if (indexStart !== secretNumber) {
-    console.log("You cheated");
-
-    process.exit();
+async function inputSan(userInput, requires) {
+  //if require array has number in it
+  if (requires.includes("number")) {
+    //While userinput is not a number or nothing (user inputs enter)
+    while (isNaN(userInput) === true || userInput === "") {
+      //ask them to enter a valid number set input to userinput
+      userInput = await ask("please enter a valid number!");
+    }
+    //if string
+  } else {
+    //While requires doesn't have user input in it
+    while (requires.includes(userInput) === false) {
+      //Ask for new input
+      userInput = await ask("Please enter a valid input!");
+    }
   }
+  //Return new sanitized userInput
+  return userInput;
 }
